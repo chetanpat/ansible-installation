@@ -1,0 +1,157 @@
+Ansible
+
+Ansible can installed in 3 ways
+1. By using yum
+2. By using pip
+3. By using compile file
+
+Installation Steps: Install Ansible on root account
+1. Ansible-Architecture: 
+    Master: 
+    
+        ssh -i /Users/chetanpatil/Downloads/awskeypair/MyNewKey.pem ec2-user@ec2-3-237-83-205.compute-1.amazonaws.com
+
+    Node: 
+
+        ssh -i /Users/chetanpatil/Downloads/awskeypair/MyNewKey.pem ec2-user@ec2-100-26-171-38.compute-1.amazonaws.com
+
+
+2. RHEL EPEL Package 
+
+    RHEL: yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+
+	Download epel repository : 
+        wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+	Install epel repository : 
+        yum install epel-release-latest-7.noarch.rpm
+
+	Update epel repository: 
+        yum update -y
+
+	Install all individual packages inside the repository.
+        yum install git python python-devel python-pip openssl ansible -y
+
+
+3. Create ansadmin user and create password for the same user for Control server and Node
+	sudo useradd ansadmin
+	sudo passwd ansadmin
+
+4. Provide root privileges to ansadmin user for Control server and Node
+  	visudo
+
+5. Provide passwordless authentication in all servers under /etc/ssh/ssh_config
+	nano /etc/ssh/sshd_config
+	service sshd restart
+
+6. Create a ssh keygen from control server
+	ssh-keygen
+
+7. Copy ssh keygen from control machine to remote nodes
+	ssh-copy-id <remote-nodes>
+
+8. Create clone of /etc/ansible directory to customised dir in Control machine
+	cp -r /etc/ansible /dest_dir
+
+9. Add a group of hosts inside a hosts file
+	nano /dest_dir/etc/ansible/hosts
+
+10. Default directory structure of Ansible
+	/etc/ansible
+		|
+		|_ _ _ ansible.cfg hosts roles
+
+11. Create own inventory file and run with below command
+	vi /etc/ansible/inventory
+	/etc/ansible/inventory
+	ansible all -m ping -i inventory 
+
+12. Host Key Checking: When we connect to remote machine from ssh as it will ask for host key checking whenever the IP is going to be changed every time when the instance 	get restarts.
+	Temporary: CLI export ANSIBLE_HOST_KEY_CHECKING=false
+	To disable: vi /etc/ansible/ansible.cfg
+			   host_key_checking=false
+
+13. Add group of groups in hosts file
+	vi /etc/ansible/hosts
+		[db_group:children]
+		 db_mysql
+		 db_oracle
+
+14.Priority based location for the ansible.cfg file - If the inventory file is not available in the current dir[2nd priority] as it won’t move for further locations as well
+	export ANSIBLE_CONFIG in CLI 	- 1st Priority
+	./ansible.cfgfrom current dir 		- 2nd Priority
+	~/ansible.cfg from the root		- 3rd Priority
+	/etc/asnible/ansible.cfg			- default one
+
+15. Video-11-Need to add
+
+16. Ad-hoc commands and Playbooks
+	Ad-hoc command is one-liner command used to perform a single task on a hosts/targets ———> single command to execute on shell
+	Playbooks have a group of tasks to perform a operation ———> shell script file ex. multi_commands.sh
+	
+	ansible all -m shell -a “uptime”
+	ansible <group_name> -m <module_name> arguments “ command_name”
+	ansible -i <inv_name> <group_name> -m <module_name> arguments “ command_name”
+
+17. List out all the modules in ansible
+	Modules List: ansible-doc -i
+	To know about each module: ansible-doc <module_name>	
+
+18. How Ansible works?
+	If we run ansible Adhoc or Playbooks, control machine is look for the ansible.cfg file which contains the inventory location which consists of hosts or managed node IP addresses or host names. And then it establishes the ssh connection in between control server and managed nodes. After that it copies the module onto managed nodes. 
+Default location is /home/ansadmin/.ansible/tmp. If we need to have a further location, then we need to pass the variable ANSIBLE_KEEP_REMOTE_FILES=1
+ANSIBLE_KEEP_REMOTE_FILES=1 ansible all -m shell -a “uptime”
+
+If we have 100 servers then if we want to execute the commands serially then we use forks=1. For the parallel execution at all once the settings in ansible.cfg file is “forks=100”
+
+19. Copy Module: Transfer the files from ansible engine to managed nodes
+	ansible all -m copy -a “src=<path> dest=<path>”
+Ansible have property called idempotent. If there is no changes in the destination directory.
+	
+	Copy the files or directory from source to destination
+		ansible all -m copy -a “src=./hosts dest=/tmp"
+	Copy the contents from source to destination
+		ansible all -m copy -a "content=‘This is a copy module' dest=/tmp/sample.txt "
+	Copy the contents from source to destination with backup		
+		ansible all -m copy -a "content='copy module' dest=/tmp/sample.txt backup=yes"
+	Copy the contents[move to next line] from source to destination
+		ansible all -m copy -a “content=‘This is copy module/n’ dest=/tmp/sample.txt”
+
+20. Fetch Module: Transfer or download the files from managed nodes to ansible engine
+	Copy the files or directory from user home[source] to user home of the destination	
+		ansible all -m fetch -a “src=/home/ansadmin/demo.txt dest=/home/ansadmin”
+	Copy the files or directory from user home[source] to current directory	
+		ansible all -m fetch -a “src=/home/ansadmin/demo.txt dest=./demo”
+	Copy the files or directory from user home[source] to current directory with a modified location
+		ansible all -m fetch -a "src=/home/ansadmin/demo.txt dest=./newdemo /{{inventory_hostname}}_demo.txt flat=yes"
+
+21. File Module: Create the file/dir or delete file/dir or assign mode or assign groups 
+	ansible all -m file -a "path=/home/ansadmin/demo.txt state=touch"
+	ansible all -m file -a "path=/home/ansadmin/file state=directory mode='0777'"
+	ansible all -m file -a "path=/etc/file1.txt state=touch" -b
+
+22. Different Types of Files module- Refer ansible official documentation @ https://docs.ansible.com/
+
+23. Yum Module: To install the git, httpd, nginx, python onto remote servers
+	ansible all -m yum -a '"name=git state=present/latest/delete" -b
+
+24. Ansible Facts/Setup Module: It's nothing but information about the managed node: os distribution, processors, release, python..etc
+	The task of collecting information of the managed node or remote servers is called as ansible facts or gathering facts.
+	The collected or gathered information is called facts or variables.
+	Two types of facts:	
+        * Default Facts: You can get default with setup module
+        * Custom Facts: You need to write scripts to get custom facts	
+	
+	ansible all -m setup 
+	ansible all -m setup -a "filter=ansible_mounts"
+	ansible all -m setup -a "filter=ansible_architecture"
+25. Custom Facts: Why we need?
+        * To get the user defined facts
+        * EX: I need to get the versions of git, httpd or web logic 
+        * To identify the prod/non-prod/qa servers/dev servers	
+
+	ansible all -m setup | egrep -i "(git_ver|httpd_ver)"
+	ansible all -m setup -a "filter=ansible_local"
+	ansible all -m file -a "path=/etc/ansible/facts.d state=directory mode=0755" -b
+	ansible all -m copy -a "src=/etc/ansible/facts.d/git_ver.fact dest=/etc/ansible/facts.d mode=0755" -b
+	ansible all -m setup -a "filter=ansible_local"
